@@ -36,6 +36,7 @@ import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.event.PermissionCheckEvent;
 import net.md_5.bungee.api.event.ServerConnectEvent;
+import net.md_5.bungee.api.event.ServerConnectFailEvent;
 import net.md_5.bungee.api.score.Scoreboard;
 import net.md_5.bungee.chat.ComponentSerializer;
 import net.md_5.bungee.connection.InitialHandler;
@@ -343,10 +344,16 @@ public final class UserConnection implements ProxiedPlayer
                     pendingConnects.remove( target );
 
                     ServerInfo def = updateAndGetNextServer( target );
-                    if ( request.isRetry() && def != null && ( getServer() == null || def != getServer().getInfo() ) )
+
+                    // Call our fail event if the future isn't successful
+                    ServerConnectFailEvent failEvent = new ServerConnectFailEvent(UserConnection.this, target, def, future.cause(), true);
+                    ProxyServer.getInstance().getPluginManager().callEvent( failEvent );
+
+                    if ( request.isRetry() && failEvent.getFallbackServer() != null &&
+                            ( getServer() == null || failEvent.getFallbackServer() != getServer().getInfo() ) )
                     {
-                        sendMessage( bungee.getTranslation( "fallback_lobby" ) );
-                        connect( def, null, true, ServerConnectEvent.Reason.LOBBY_FALLBACK );
+                        connect( failEvent.getFallbackServer(), null, false );
+                        System.out.println( bungee.getTranslation( "fail_event", name ) );
                     } else if ( dimensionChange )
                     {
                         disconnect( bungee.getTranslation( "fallback_kick", future.cause().getClass().getName() ) );
